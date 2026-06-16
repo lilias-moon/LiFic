@@ -22,6 +22,9 @@ struct Token {
   char *str;      // トークン文字列
 };
 
+// ユーザーの入力を保存するグローバル変数
+char *user_input;
+
 // 現在着目しているトークン
 Token *token;
 
@@ -30,6 +33,19 @@ Token *token;
 void error(char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
+  vfprintf(stderr, fmt, ap);
+  fprintf(stderr, "\n");
+  exit(1);
+}
+
+// Reports an error and exit.
+void error_at(char *loc, char *fmt, ...) {
+  va_list ap;
+  va_start(ap, fmt);
+  int pos = loc - user_input;
+  fprintf(stderr, "%s\n", user_input);
+  fprintf(stderr, "%*s", pos, ""); // print pos spaces.
+  fprintf(stderr, "^ ");
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
   exit(1);
@@ -48,7 +64,7 @@ bool consume(char op) {
 // それ以外の場合にはエラーを報告する。
 void expect(char op) {
   if (token->kind != TK_RESERVED || token->str[0] != op)
-    error("'%c'ではありません", op);
+    error_at(token->str, "expected '%c'", op);
   token = token->next;
 }
 
@@ -56,7 +72,7 @@ void expect(char op) {
 // それ以外の場合にはエラーを報告する。
 int expect_number() {
   if (token->kind != TK_NUM)
-    error("数ではありません");
+    error_at(token->str, "expected a number");
   int val = token->val;
   token = token->next;
   return val;
@@ -75,14 +91,14 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
   return tok;
 }
 
-// 入力文字列pをトークナイズしてそれを返す
-Token *tokenize(char *p) {
+// Tokenize `user_input` and returns new tokens.
+Token *tokenize() {
+  char *p = user_input;
   Token head;
   head.next = NULL;
   Token *cur = &head;
 
   while (*p) {
-    // 空白文字をスキップ
     if (isspace(*p)) {
       p++;
       continue;
@@ -99,7 +115,7 @@ Token *tokenize(char *p) {
       continue;
     }
 
-    error("トークナイズできません");
+    error_at(p, "expected a number");
   }
 
   new_token(TK_EOF, cur, p);
@@ -108,24 +124,19 @@ Token *tokenize(char *p) {
 
 int main(int argc, char **argv) {
   if (argc != 2) {
-    error("引数の個数が正しくありません");
+    error("%s: invalid number of arguments", argv[0]);
     return 1;
   }
 
-  // トークナイズする
-  token = tokenize(argv[1]);
+  user_input = argv[1];
+  token = tokenize();
 
-  // アセンブリの前半部分を出力
   printf(".intel_syntax noprefix\n");
   printf(".globl main\n");
   printf("main:\n");
 
-  // 式の最初は数でなければならないので、それをチェックして
-  // 最初のmov命令を出力
   printf("  mov rax, %d\n", expect_number());
 
-  // `+ <数>`あるいは`- <数>`というトークンの並びを消費しつつ
-  // アセンブリを出力
   while (!at_eof()) {
     if (consume('+')) {
       printf("  add rax, %d\n", expect_number());
