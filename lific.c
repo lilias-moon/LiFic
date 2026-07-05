@@ -20,6 +20,7 @@ struct Token {
   Token *next;    // 次の入力トークン
   int val;        // kindがTK_NUMの場合、その数値
   char *str;      // トークン文字列
+  int len;        // トークンの長さ
 };
 
 // 抽象構文木のノードの種類
@@ -72,18 +73,22 @@ void error_at(char *loc, char *fmt, ...) {
 
 // 次のトークンが期待している記号のときには、トークンを1つ読み進めて
 // 真を返す。それ以外の場合には偽を返す。
-bool consume(char op) {
-  if (token->kind != TK_RESERVED || token->str[0] != op)
+bool consume(char *op) {
+  if (token->kind != TK_RESERVED || 
+    strlen(op) != token ->len ||
+    memcmp(token->str, op, token->len))
     return false;
   token = token->next;
   return true;
 }
 
-// 次のトークンが期待している記号のときには、トークンを1つ読み進める。
+//次のトークンが期待している記号のときには、トークンを1つ読み進める。
 // それ以外の場合にはエラーを報告する。
-void expect(char op) {
-  if (token->kind != TK_RESERVED || token->str[0] != op)
-    error_at(token->str, "expected '%c'", op);
+void expect(char *op) {
+  if (token->kind != TK_RESERVED || 
+    strlen(op) !=token->len||
+    memcmp(token->str, op, token->len))
+    error_at(token->str, "expected '%s'", op);
   token = token->next;
 }
 
@@ -106,6 +111,7 @@ Token *new_token(TokenKind kind, Token *cur, char *str) {
   Token *tok = calloc(1, sizeof(Token));
   tok->kind = kind;
   tok->str = str;
+  tok->len = len;
   cur->next = tok;
   return tok;
 }
@@ -145,6 +151,10 @@ Node *expr(void);
 Node *mul(void);
 Node *primary(void);
 Node *unary(void);
+Node *add(void);
+Node *relational(void);
+Node *equality(void);
+
 
 
 Node *new_node(NodeKind kind, Node *lhs, Node *rhs) {
@@ -187,6 +197,14 @@ Node *mul() {
       return node;
   }
 }
+
+expr       = equality
+equality   = relational ("==" relational | "!=" relational)*
+relational = add ("<" add | "<=" add | ">" add | ">=" add)*
+add        = mul ("+" mul | "-" mul)*
+mul        = unary ("*" unary | "/" unary)*
+unary      = ("+" | "-")? primary
+primary    = num | "(" expr ")"
 
 Node *unary() {
   if (consume('+'))
