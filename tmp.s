@@ -1,19 +1,12 @@
 .intel_syntax noprefix
-.globl main
+.global main
 main:
-  push 1
+  push 2
   push 2
   pop rdi
   pop rax
   cmp rax, rdi
-  setl al
-  movzb rax, al
-  push rax
-  push 1
-  pop rdi
-  pop rax
-  cmp rax, rdi
-  sete al
+  setle al
   movzb rax, al
   push rax
   pop rax
